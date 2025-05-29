@@ -39,4 +39,7 @@ buildNumber.properties
 .history
 .ionide
 
+# dotenv
+.env
+
 # End of https://www.toptal.com/developers/gitignore/api/maven,visualstudiocode
