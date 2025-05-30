@@ -19,12 +19,23 @@ It reads table structures and data from Oracle and creates equivalent tables and
 
 ## Setup & Usage
 
-1. **Configure Database Connections**  
-   Set your Oracle and H2 connection info in the `.env` file:
+1. **Configure Database Connections**
 
-2. **Run the Application**  
-   Use Maven to run the application:
+- Set your Oracle and H2 connection info in the `.env` file:
+
+2. **Run the Application**
+
+- Use Maven to run the application:
 
 ```bash
 mvn exec:java -Dexec.mainClass="com.suyons.Main"
+```
+
+3. **Schedule the Application (Optional)**
+
+- The maven command above is configured to `run.cmd` file.
+- So you can add this file to `Task Scheduler` to run it daily.
+
+```cmd
+schtasks /Create /SC DAILY /TN "Clone Oracle to H2" /TR "C:\folder1\folder2\run.cmd" /ST 05:00
 ```
