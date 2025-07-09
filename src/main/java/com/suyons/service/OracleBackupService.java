@@ -30,13 +30,8 @@ public class OracleBackupService {
     private static final String H2_USERNAME = dotenv.get("H2_USERNAME");
     private static final String H2_PASSWORD = dotenv.get("H2_PASSWORD");
 
-    // Oracle schemas to exclude from backup (e.g., system schemas)
-    private static final List<String> EXCLUDE_SCHEMAS = Arrays.asList(
-            "ANONYMOUS", "APPQOSSYS", "AUDSYS", "CTXSYS", "DBSFWUSER", "DBSNMP", "DIP", "DVF", "DVSYS",
-            "GGSYS", "GSMADMIN_INTERNAL", "GSMCATUSER", "GSMROOTUSER", "GSMUSER", "HR", "LBACSYS",
-            "MDDATA", "MDSYS", "OJVMSYS", "OLAPSYS", "ORACLE_OCM", "ORDDATA", "ORDPLUGINS", "ORDSYS",
-            "OUTLN", "REMOTE_SCHEDULER_AGENT", "SI_INFORMTN_SCHEMA", "SYS", "SYS$UMF", "SYSBACKUP",
-            "SYSDG", "SYSKM", "SYSRAC", "SYSTEM", "WMSYS", "XDB", "XS$NULL");
+    // Target schemas to include in backup
+    private static final List<String> TARGET_SCHEMAS = Arrays.asList("BIUADM", "BIDADM");
 
     public void execute() {
         log.info("Starting Oracle to H2 backup.");
@@ -51,20 +46,20 @@ public class OracleBackupService {
         try (Connection oracleConn = DriverManager.getConnection(ORACLE_URL, ORACLE_USERNAME, ORACLE_PASSWORD);
                 Connection h2Conn = DriverManager.getConnection(H2_URL, H2_USERNAME, H2_PASSWORD)) {
 
-            // Query schema list from Oracle and create schemas in H2, excluding
-            // EXCLUDE_SCHEMAS
+            // Query schema list from Oracle and create schemas in H2, including only
+            // TARGET_SCHEMAS
             List<String> schemaNames = new ArrayList<>();
-            StringBuilder excludeClause = new StringBuilder();
-            for (int i = 0; i < EXCLUDE_SCHEMAS.size(); i++) {
-                excludeClause.append("?");
-                if (i < EXCLUDE_SCHEMAS.size() - 1) {
-                    excludeClause.append(", ");
+            StringBuilder includeClause = new StringBuilder();
+            for (int i = 0; i < TARGET_SCHEMAS.size(); i++) {
+                includeClause.append("?");
+                if (i < TARGET_SCHEMAS.size() - 1) {
+                    includeClause.append(", ");
                 }
             }
-            String schemaSql = "SELECT USERNAME FROM ALL_USERS WHERE USERNAME NOT IN (" + excludeClause + ")";
+            String schemaSql = "SELECT USERNAME FROM ALL_USERS WHERE USERNAME IN (" + includeClause + ")";
             try (PreparedStatement pstmt = oracleConn.prepareStatement(schemaSql)) {
-                for (int i = 0; i < EXCLUDE_SCHEMAS.size(); i++) {
-                    pstmt.setString(i + 1, EXCLUDE_SCHEMAS.get(i));
+                for (int i = 0; i < TARGET_SCHEMAS.size(); i++) {
+                    pstmt.setString(i + 1, TARGET_SCHEMAS.get(i));
                 }
                 try (ResultSet rs = pstmt.executeQuery()) {
                     while (rs.next()) {
@@ -135,25 +130,22 @@ public class OracleBackupService {
     private List<String> getAllUserTables(Connection oracleConn) throws SQLException {
         List<String> tableNames = new ArrayList<>();
         // Use ALL_TABLES view to get all accessible tables for the current user.
-        // Add OWNER filter to exclude system tables.
-        String sql = "SELECT OWNER || '.' || TABLE_NAME FROM ALL_TABLES " +
-                "WHERE OWNER NOT IN (?) " +
-                "AND TABLE_NAME NOT LIKE 'BIN$%'"; // Exclude recycle bin objects
-
+        // Filter by TARGET_SCHEMAS to include only specific schemas.
+        
         // Dynamically bind values for IN clause in PreparedStatement
         StringBuilder ownerInClause = new StringBuilder();
-        for (int i = 0; i < EXCLUDE_SCHEMAS.size(); i++) {
+        for (int i = 0; i < TARGET_SCHEMAS.size(); i++) {
             ownerInClause.append("?");
-            if (i < EXCLUDE_SCHEMAS.size() - 1) {
+            if (i < TARGET_SCHEMAS.size() - 1) {
                 ownerInClause.append(", ");
             }
         }
-        sql = "SELECT OWNER || '.' || TABLE_NAME FROM ALL_TABLES WHERE OWNER NOT IN (" + ownerInClause.toString()
+        String sql = "SELECT OWNER || '.' || TABLE_NAME FROM ALL_TABLES WHERE OWNER IN (" + ownerInClause.toString()
                 + ") AND TABLE_NAME NOT LIKE 'BIN$%' AND NESTED='NO'";
 
         try (PreparedStatement pstmt = oracleConn.prepareStatement(sql)) {
-            for (int i = 0; i < EXCLUDE_SCHEMAS.size(); i++) {
-                pstmt.setString(i + 1, EXCLUDE_SCHEMAS.get(i));
+            for (int i = 0; i < TARGET_SCHEMAS.size(); i++) {
+                pstmt.setString(i + 1, TARGET_SCHEMAS.get(i));
             }
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
