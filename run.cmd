@@ -1,1 +1,1 @@
-mvn exec:java -Dexec.mainClass="com.suyons.Main"
+mvn clean compile exec:java -Dexec.mainClass=com.suyons.Main
